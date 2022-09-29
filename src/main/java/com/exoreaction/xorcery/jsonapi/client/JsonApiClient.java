@@ -97,8 +97,8 @@ public final class JsonApiClient {
 
         @Override
         public void failed(Throwable throwable) {
-            if (throwable instanceof ProcessingException processingException) {
-                future.completeExceptionally(new ProcessingException(link.getHref(), processingException.getCause()));
+            if (throwable instanceof ProcessingException) {
+                future.completeExceptionally(new ProcessingException(link.getHref(), throwable.getCause()));
             } else {
                 future.completeExceptionally(throwable);
             }
