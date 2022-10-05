@@ -11,7 +11,6 @@ import jakarta.ws.rs.client.InvocationCallback;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 public final class JsonApiClient {
     private final Client client;
@@ -20,7 +19,7 @@ public final class JsonApiClient {
         this.client = client;
     }
 
-    public CompletionStage<ResourceDocument> get(Link link) {
+    public CompletableFuture<ResourceDocument> get(Link link) {
         CompletableFuture<ResourceDocument> future = new CompletableFuture<>();
         client.target(link.getHrefAsUri())
                 .request(MediaTypes.APPLICATION_JSON_API_TYPE)
@@ -30,7 +29,7 @@ public final class JsonApiClient {
     }
 
 
-    public CompletionStage<ResourceObject> submit(Link link, ResourceObject resourceObject) {
+    public CompletableFuture<ResourceObject> submit(Link link, ResourceObject resourceObject) {
         CompletableFuture<ResourceObject> future = new CompletableFuture<>();
         client.target(link.getHrefAsUri())
                 .request(MediaTypes.APPLICATION_JSON_API_TYPE)
@@ -46,7 +45,7 @@ public final class JsonApiClient {
      * @param resourceDocument
      * @return
      */
-    public CompletionStage<ResourceObject> submit(Link link, ResourceDocument resourceDocument) {
+    public CompletableFuture<ResourceObject> submit(Link link, ResourceDocument resourceDocument) {
         CompletableFuture<ResourceObject> future = new CompletableFuture<>();
         client.target(link.getHrefAsUri())
                 .request(MediaTypes.APPLICATION_JSON_API_TYPE)
