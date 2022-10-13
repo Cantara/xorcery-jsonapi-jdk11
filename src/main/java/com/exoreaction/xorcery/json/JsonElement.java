@@ -80,7 +80,10 @@ public interface JsonElement {
         {
             if (value instanceof NumericNode) {
                 return Optional.of(value.intValue());
-            } else {
+            }
+            try {
+                return Optional.of(Integer.valueOf(value.asText()));
+            } catch (NumberFormatException e) {
                 return Optional.empty();
             }
         });
@@ -91,7 +94,10 @@ public interface JsonElement {
         {
             if (value instanceof NumericNode) {
                 return Optional.of(value.longValue());
-            } else {
+            }
+            try {
+                return Optional.of(Long.valueOf(value.asText()));
+            } catch (NumberFormatException e) {
                 return Optional.empty();
             }
         });
