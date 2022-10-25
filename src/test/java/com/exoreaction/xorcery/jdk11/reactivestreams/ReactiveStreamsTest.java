@@ -6,6 +6,7 @@ import com.exoreaction.xorcery.jdk11.reactivestreams.client.impl.JettyAndJerseyB
 import com.exoreaction.xorcery.jdk11.reactivestreams.fibonacci.FibonacciPublisher;
 import com.exoreaction.xorcery.jdk11.reactivestreams.media.LongMessageBodyReader;
 import com.exoreaction.xorcery.jdk11.reactivestreams.media.LongMessageBodyWriter;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeoutException;
 public class ReactiveStreamsTest {
 
     @Test
+    @Disabled
     public void thatSequenceCanBePublished() throws InterruptedException, ExecutionException, TimeoutException {
         Configuration configuration = new Configuration.Builder()
                 .build();
