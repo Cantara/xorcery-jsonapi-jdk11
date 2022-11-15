@@ -1,6 +1,7 @@
 package com.exoreaction.xorcery.jdk11.metadata;
 
-import com.exoreaction.xorcery.jdk11.json.JsonElement;
+import com.exoreaction.xorcery.jdk11.builders.With;
+import com.exoreaction.xorcery.jdk11.json.model.JsonElement;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -16,40 +17,41 @@ public final class Metadata
     private final ObjectNode json;
 
 
-    public static final class Builder {
+    public static final class Builder
+                implements With<Builder> {
         private final ObjectNode builder;
 
         public Builder(ObjectNode builder) {
             this.builder = builder;
         }
 
-        public Builder() {
-            this(JsonNodeFactory.instance.objectNode());
-        }
+            public Builder() {
+                this(JsonNodeFactory.instance.objectNode());
+            }
 
-        public Builder add(String name, String value) {
-            builder.set(name, builder.textNode(value));
-            return this;
-        }
+            public Builder add(String name, String value) {
+                builder.set(name, builder.textNode(value));
+                return this;
+            }
 
-        public Builder add(String name, long value) {
-            builder.set(name, builder.numberNode(value));
-            return this;
-        }
+            public Builder add(String name, long value) {
+                builder.set(name, builder.numberNode(value));
+                return this;
+            }
 
-        public Builder add(String name, ObjectNode value) {
-            builder.set(name, value);
-            return this;
-        }
+            public Builder add(String name, ObjectNode value) {
+                builder.set(name, value);
+                return this;
+            }
 
-        public Builder add(Metadata metadata) {
-            this.builder.setAll(metadata.json);
-            return this;
-        }
+            public Builder add(Metadata metadata) {
+                this.builder.setAll(metadata.json);
+                return this;
+            }
 
-        public Metadata build() {
-            return new Metadata(builder);
-        }
+            public Metadata build() {
+                return new Metadata(builder);
+            }
 
         public ObjectNode builder() {
             return builder;
@@ -74,7 +76,7 @@ public final class Metadata
                     "builder=" + builder + ']';
         }
 
-    }
+        }
 
     @JsonCreator(mode = DELEGATING)
     public Metadata(ObjectNode json) {
@@ -88,6 +90,10 @@ public final class Metadata
 
     public Builder toBuilder() {
         return new Builder(json);
+    }
+
+    public Metadata copy() {
+        return new Metadata(json.deepCopy());
     }
 
     @Override

@@ -1,4 +1,4 @@
-package com.exoreaction.xorcery.jdk11.json;
+package com.exoreaction.xorcery.jdk11.json.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;

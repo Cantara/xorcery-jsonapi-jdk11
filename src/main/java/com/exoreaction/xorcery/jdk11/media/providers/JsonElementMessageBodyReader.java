@@ -1,6 +1,6 @@
 package com.exoreaction.xorcery.jdk11.media.providers;
 
-import com.exoreaction.xorcery.jdk11.json.JsonElement;
+import com.exoreaction.xorcery.jdk11.json.model.JsonElement;
 import com.exoreaction.xorcery.jdk11.media.MediaTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

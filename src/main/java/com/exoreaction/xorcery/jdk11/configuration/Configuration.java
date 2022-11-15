@@ -1,8 +1,8 @@
 package com.exoreaction.xorcery.jdk11.configuration;
 
-import com.exoreaction.xorcery.jdk11.json.JsonElement;
 import com.exoreaction.xorcery.jdk11.json.JsonMerger;
 import com.exoreaction.xorcery.jdk11.json.VariableResolver;
+import com.exoreaction.xorcery.jdk11.json.model.JsonElement;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
