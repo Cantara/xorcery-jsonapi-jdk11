@@ -170,9 +170,6 @@ public final class JsonDomainEvent
 
             public StateBuilder removedRelationship(String relationship, String type, String id) {
 
-                if (id == null)
-                    return this;
-
                 JsonNode relationships = builder.get("removedrelationships");
                 if (relationships == null) {
                     relationships = builder.arrayNode();
@@ -182,7 +179,7 @@ public final class JsonDomainEvent
                 ArrayNode arrayNode = (ArrayNode) relationships;
                 JsonNode relationshipNode = arrayNode.objectNode()
                         .<ObjectNode>set("type", arrayNode.textNode(type))
-                        .<ObjectNode>set("id", arrayNode.textNode(id))
+                        .<ObjectNode>set("id", id == null ? arrayNode.nullNode() : arrayNode.textNode(id))
                         .set("relationship", arrayNode.textNode(relationship));
                 arrayNode.add(relationshipNode);
 
