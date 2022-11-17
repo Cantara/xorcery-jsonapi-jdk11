@@ -1,34 +1,22 @@
 package com.exoreaction.xorcery.jdk11.reactivestreams.client.impl;
 
 import com.exoreaction.xorcery.jdk11.configuration.Configuration;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaReader;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaWriter;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.api.ReactiveStreamsClient;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.api.WithResult;
-import com.exoreaction.xorcery.jdk11.util.Classes;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.ext.MessageBodyReader;
-import jakarta.ws.rs.ext.MessageBodyWriter;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.io.ArrayByteBufferPool;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.inject.hk2.Hk2InjectionManagerFactory;
-import org.glassfish.jersey.internal.BootstrapBag;
-import org.glassfish.jersey.internal.inject.Bindings;
-import org.glassfish.jersey.internal.inject.InjectionManager;
-import org.glassfish.jersey.message.MessageBodyWorkers;
-import org.glassfish.jersey.message.internal.MessageBodyFactory;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -39,7 +27,7 @@ import java.util.Timer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
-public class JettyAndJerseyBasedReactiveStreamsClient implements ReactiveStreamsClient {
+public class JettyBasedReactiveStreamsClient implements ReactiveStreamsClient {
 
     private final HttpClient httpClient;
     private final WebSocketClient webSocketClient;
@@ -49,9 +37,10 @@ public class JettyAndJerseyBasedReactiveStreamsClient implements ReactiveStreams
 
     private final ByteBufferPool byteBufferPool;
 
-    private final MessageBodyWorkers messageBodyWorkers;
+    private final List<XorceryClientMediaWriter> writers;
+    private final List<XorceryClientMediaReader> readers;
 
-    public JettyAndJerseyBasedReactiveStreamsClient(Configuration configuration, List<Class<? extends MessageBodyWriter<?>>> writerClasses, List<Class<? extends MessageBodyReader<?>>> readerClasses) {
+    public JettyBasedReactiveStreamsClient(Configuration configuration, List<XorceryClientMediaWriter> writers, List<XorceryClientMediaReader> readers) {
         this.httpClient = new JettyClientInitializer().createClient(configuration);
         this.webSocketClient = new WebSocketClient(httpClient);
         this.webSocketClient.setIdleTimeout(Duration.ofSeconds(httpClient.getIdleTimeout()));
@@ -67,27 +56,8 @@ public class JettyAndJerseyBasedReactiveStreamsClient implements ReactiveStreams
         this.objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.timer = new Timer();
         this.byteBufferPool = new ArrayByteBufferPool();
-        MessageBodyFactory.MessageBodyWorkersConfigurator configurator = new MessageBodyFactory.MessageBodyWorkersConfigurator();
-        BootstrapBag bootstrapBag = new BootstrapBag();
-        ClientConfig jerseyClientConfig = new ClientConfig();
-        InjectionManager injectionManager = new Hk2InjectionManagerFactory().create(null);
-        injectionManager.register(Bindings.service(new ObjectMapper()));
-        AbstractBinder binder = new AbstractBinder() {
-            @Override
-            protected void configure() {
-                for (Class clazz : readerClasses) {
-                    bind(clazz).to(MessageBodyReader.class);
-                }
-                for (Class clazz : writerClasses) {
-                    bind(clazz).to(MessageBodyWriter.class);
-                }
-            }
-        };
-        injectionManager.register(binder);
-        bootstrapBag.setConfiguration(jerseyClientConfig);
-        configurator.init(injectionManager, bootstrapBag);
-        configurator.postInit(injectionManager, bootstrapBag); // will scan and find our message-body readers and writers
-        this.messageBodyWorkers = injectionManager.getInstance(MessageBodyWorkers.class);
+        this.writers = writers;
+        this.readers = readers;
     }
 
     @Override
@@ -102,8 +72,8 @@ public class JettyAndJerseyBasedReactiveStreamsClient implements ReactiveStreams
         Type eventType = getEventType(type);
         Optional<Type> resultType = getResultType(type);
 
-        MessageBodyWriter<Object> eventWriter = getWriter(eventType);
-        MessageBodyReader<Object> resultReader = resultType.map(this::getReader).orElse(null);
+        XorceryClientMediaWriter<Object> eventWriter = getWriter(eventType);
+        XorceryClientMediaReader<Object> resultReader = resultType.map(this::getReader).orElse(null);
 
         // Start publishing process
         new PublishingProcess(
@@ -200,22 +170,37 @@ public class JettyAndJerseyBasedReactiveStreamsClient implements ReactiveStreams
         return Optional.ofNullable(type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(WithResult.class) ? ((ParameterizedType) type).getActualTypeArguments()[1] : null);
     }
 
-    private MessageBodyWriter<Object> getWriter(Type type) {
-        if (!type.equals(ByteBuffer.class)) {
-            return Optional.ofNullable(messageBodyWorkers.getMessageBodyWriter(Classes.getClass(type), type, new Annotation[0], MediaType.WILDCARD_TYPE))
-                    .orElseThrow(() -> new IllegalStateException("Could not find MessageBodyWriter for " + type));
-        } else {
-            return null;
-        }
+    private XorceryClientMediaWriter<Object> getWriter(Type type) {
+        return writers.stream()
+                .filter(writer -> {
+                    for (Type genericInterface : writer.getClass().getGenericInterfaces()) {
+                        if (genericInterface.getTypeName().startsWith(XorceryClientMediaWriter.class.getTypeName() + "<")) {
+                            Type actualTypeArgument = ((ParameterizedType) genericInterface).getActualTypeArguments()[0];
+                            if (type.getTypeName().equals(actualTypeArgument.getTypeName())) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                })
+                .findFirst()
+                .orElse(null);
     }
 
-    private MessageBodyReader<Object> getReader(Type type) {
-        if (!type.equals(ByteBuffer.class)) {
-            return Optional.ofNullable(messageBodyWorkers.getMessageBodyReader(Classes.getClass(type), type, new Annotation[0], MediaType.WILDCARD_TYPE))
-                    .orElseThrow(() -> new IllegalStateException("Could not find MessageBodyReader for " + type));
-        } else {
-            return null;
-        }
+    private XorceryClientMediaReader<Object> getReader(Type type) {
+        return readers.stream()
+                .filter(reader -> {
+                    for (Type genericInterface : reader.getClass().getGenericInterfaces()) {
+                        if (genericInterface.getTypeName().startsWith(XorceryClientMediaReader.class.getTypeName() + "<")) {
+                            Type actualTypeArgument = ((ParameterizedType) genericInterface).getActualTypeArguments()[0];
+                            if (type.getTypeName().equals(actualTypeArgument.getTypeName())) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                })
+                .findFirst()
+                .orElse(null);
     }
-
 }

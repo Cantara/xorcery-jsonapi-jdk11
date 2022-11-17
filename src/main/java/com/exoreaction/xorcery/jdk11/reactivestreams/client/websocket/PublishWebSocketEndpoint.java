@@ -2,26 +2,22 @@ package com.exoreaction.xorcery.jdk11.reactivestreams.client.websocket;
 
 import com.exoreaction.xorcery.jdk11.concurrent.NamedThreadFactory;
 import com.exoreaction.xorcery.jdk11.configuration.Configuration;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaReader;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaWriter;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.api.WithResult;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.impl.PublishingProcess;
 import com.exoreaction.xorcery.jdk11.util.Classes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.dsl.Disruptor;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.MultivaluedHashMap;
-import jakarta.ws.rs.ext.MessageBodyReader;
-import jakarta.ws.rs.ext.MessageBodyWriter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.Marker;
-import org.apache.logging.log4j.MarkerManager;
 import org.eclipse.jetty.io.ByteBufferOutputStream2;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.StatusCode;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.eclipse.jetty.websocket.api.WriteCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
@@ -37,6 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -44,14 +41,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class PublishWebSocketEndpoint
         implements WebSocketListener, Flow.Subscriber<Object> {
-    private final static Logger logger = LogManager.getLogger(PublishWebSocketEndpoint.class);
+    private final static Logger logger = LoggerFactory.getLogger(PublishWebSocketEndpoint.class);
 
     private static final byte[] XOR = "XOR".getBytes(StandardCharsets.UTF_8);
 
     private static final Annotation[] EMPTY_ANNOTATIONS = new Annotation[0];
-    private static final MultivaluedHashMap<String, String> EMPTY_HTTP_HEADERS = new MultivaluedHashMap<>();
-    private static final MultivaluedHashMap<String, Object> EMPTY_HTTP_HEADERS2 = new MultivaluedHashMap<>();
-
     private final String webSocketPath;
     private Session session;
 
@@ -59,8 +53,8 @@ public class PublishWebSocketEndpoint
     private Flow.Subscription subscription;
     private final Semaphore semaphore = new Semaphore(0);
 
-    private final MessageBodyWriter<Object> eventWriter;
-    private final MessageBodyReader<Object> resultReader;
+    private final XorceryClientMediaWriter<Object> eventWriter;
+    private final XorceryClientMediaReader<Object> resultReader;
 
     private final Type eventType;
     private final Class<Object> eventClass;
@@ -69,7 +63,6 @@ public class PublishWebSocketEndpoint
     private final Configuration subscriberConfiguration;
     private final ObjectMapper objectMapper;
     private final ByteBufferPool pool;
-    private final Marker marker;
     private final PublishingProcess publishingProcess;
 
     private boolean redundancyNotificationIssued = false;
@@ -77,10 +70,14 @@ public class PublishWebSocketEndpoint
     private final Queue<CompletableFuture<Object>> resultQueue = new ConcurrentLinkedQueue<>();
     private Disruptor<AtomicReference<Object>> disruptor;
 
+    private static final AtomicInteger nextEndpointId = new AtomicInteger(1);
+
+    final int endpointId = nextEndpointId.getAndIncrement();
+
     public PublishWebSocketEndpoint(String webSocketPath,
                                     Flow.Publisher<Object> publisher,
-                                    MessageBodyWriter<Object> eventWriter,
-                                    MessageBodyReader<Object> resultReader,
+                                    XorceryClientMediaWriter<Object> eventWriter,
+                                    XorceryClientMediaReader<Object> resultReader,
                                     Type eventType,
                                     Type resultType,
                                     Configuration subscriberConfiguration,
@@ -98,7 +95,6 @@ public class PublishWebSocketEndpoint
         this.subscriberConfiguration = subscriberConfiguration;
         this.objectMapper = objectMapper;
         this.pool = pool;
-        this.marker = MarkerManager.getMarker(webSocketPath);
         this.publishingProcess = publishingProcess;
     }
 
@@ -113,11 +109,11 @@ public class PublishWebSocketEndpoint
                 f.future().thenAccept(Void ->
                 {
                     publisher.subscribe(this);
-                    logger.info(marker, "Connected to {}", session.getUpgradeRequest().getRequestURI());
+                    logger.info("Connected to {}", session.getUpgradeRequest().getRequestURI());
                 }).exceptionally(t ->
                 {
                     session.close(StatusCode.SERVER_ERROR, t.getMessage());
-                    logger.error(marker, "Parameter handshake failed", t);
+                    logger.error("Parameter handshake failed", t);
                     return null;
                 })
         ));
@@ -130,11 +126,11 @@ public class PublishWebSocketEndpoint
         long requestAmount = Long.parseLong(message);
 
         if (requestAmount == Long.MIN_VALUE) {
-            logger.info(marker, "Received cancel on websocket " + webSocketPath);
+            logger.info("Received cancel on websocket " + webSocketPath);
             subscription.cancel();
         } else {
             if (logger.isDebugEnabled())
-                logger.debug(marker, "Received request:" + requestAmount);
+                logger.debug("Received request:" + requestAmount);
 
             semaphore.release((int) requestAmount);
             subscription.request(requestAmount);
@@ -146,8 +142,8 @@ public class PublishWebSocketEndpoint
         try {
             if (resultReader != null) {
                 // Check if we are getting an exception back
-                if (len > XOR.length && Arrays.equals(payload, offset, offset+XOR.length, XOR, 0, XOR.length)) {
-                    ByteArrayInputStream bin = new ByteArrayInputStream(payload, offset+XOR.length, len-XOR.length);
+                if (len > XOR.length && Arrays.equals(payload, offset, offset + XOR.length, XOR, 0, XOR.length)) {
+                    ByteArrayInputStream bin = new ByteArrayInputStream(payload, offset + XOR.length, len - XOR.length);
                     ObjectInputStream oin = new ObjectInputStream(bin);
                     Throwable throwable = (Throwable) oin.readObject();
                     resultQueue.remove().completeExceptionally(throwable);
@@ -155,19 +151,18 @@ public class PublishWebSocketEndpoint
                     // Deserialize result
                     ByteArrayInputStream bin = new ByteArrayInputStream(payload, offset, len);
 
-                    Object result = resultReader.readFrom(resultClass, resultType, EMPTY_ANNOTATIONS, MediaType.WILDCARD_TYPE,
-                            EMPTY_HTTP_HEADERS, bin);
+                    Object result = resultReader.readFrom(bin);
 
                     resultQueue.remove().complete(result);
                 }
             } else {
                 if (!redundancyNotificationIssued) {
-                    logger.warn(marker, "Receiving redundant results from subscriber");
+                    logger.warn("Receiving redundant results from subscriber");
                     redundancyNotificationIssued = true;
                 }
             }
         } catch (Throwable e) {
-            logger.error(marker, "Could not read result", e);
+            logger.error("Could not read result", e);
             resultQueue.remove().completeExceptionally(e);
         }
     }
@@ -176,12 +171,12 @@ public class PublishWebSocketEndpoint
     public void onWebSocketClose(int statusCode, String reason) {
 
         if (statusCode == 1000 || statusCode == 1001 || statusCode == 1006) {
-            logger.info(marker, "Complete subscription to {}:{} {}", webSocketPath, statusCode, reason);
+            logger.info("Complete subscription to {}:{} {}", webSocketPath, statusCode, reason);
             subscription.cancel();
             publishingProcess.result().complete(null); // Now considered done
         } else {
-            logger.info(marker, "Close websocket {}:{} {}", webSocketPath, statusCode, reason);
-            logger.info(marker, "Starting subscription process again");
+            logger.info("Close websocket {}:{} {}", webSocketPath, statusCode, reason);
+            logger.info("Starting subscription process again");
             publishingProcess.retry();
         }
     }
@@ -193,7 +188,7 @@ public class PublishWebSocketEndpoint
             subscription.cancel();
             publishingProcess.result().completeExceptionally(cause); // Now considered done
         } else {
-            logger.error(marker, "Publisher websocket error", cause);
+            logger.error("Publisher websocket error", cause);
         }
     }
 
@@ -202,14 +197,14 @@ public class PublishWebSocketEndpoint
     public void onSubscribe(Flow.Subscription subscription) {
         this.subscription = subscription;
 
-        disruptor = new Disruptor<>(AtomicReference::new, 512, new NamedThreadFactory("PublishWebSocketDisruptor-" + marker.getName() + "-"));
+        disruptor = new Disruptor<>(AtomicReference::new, 512, new NamedThreadFactory("PublishWebSocketDisruptor-" + endpointId + "-"));
         disruptor.handleEventsWith(new Sender());
         disruptor.start();
     }
 
     @Override
     public void onNext(Object item) {
-        disruptor.publishEvent((e,s,event)->
+        disruptor.publishEvent((e, s, event) ->
         {
             e.set(event);
         }, item);
@@ -217,16 +212,16 @@ public class PublishWebSocketEndpoint
 
     @Override
     public void onError(Throwable throwable) {
-        logger.info(marker, "Publisher error for {}", session.getRemote().getRemoteAddress(), throwable);
+        logger.info("Publisher error for {}", session.getRemote().getRemoteAddress(), throwable);
         disruptor.shutdown();
-        logger.info(marker, "Sending close for session {}", session.getRemote().getRemoteAddress());
+        logger.info("Sending close for session {}", session.getRemote().getRemoteAddress());
         session.close(StatusCode.SERVER_ERROR, throwable.getMessage());
     }
 
     public void onComplete() {
-        logger.info(marker, "Waiting for outstanding events to be sent to {}", session.getRemote().getRemoteAddress());
+        logger.info("Waiting for outstanding events to be sent to {}", session.getRemote().getRemoteAddress());
         disruptor.shutdown();
-        logger.info(marker, "Sending complete for session {}", session.getRemote().getRemoteAddress());
+        logger.info("Sending complete for session {}", session.getRemote().getRemoteAddress());
         while (!resultQueue.isEmpty()) {
             // Wait for results to finish
             try {
@@ -256,21 +251,21 @@ public class PublishWebSocketEndpoint
                 Object item = event.get();
                 if (eventWriter != null) {
                     if (resultReader == null) {
-                        eventWriter.writeTo(item, eventClass, eventType, EMPTY_ANNOTATIONS, MediaType.WILDCARD_TYPE, EMPTY_HTTP_HEADERS2, outputStream);
+                        eventWriter.writeTo(item, outputStream);
                     } else {
 
                         WithResult<?, Object> withResult = (WithResult<?, Object>) item;
                         CompletableFuture<Object> result = withResult.result().toCompletableFuture();
                         resultQueue.add(result);
 
-                        eventWriter.writeTo(withResult.event(), eventClass, eventType, EMPTY_ANNOTATIONS, MediaType.WILDCARD_TYPE, EMPTY_HTTP_HEADERS2, outputStream);
+                        eventWriter.writeTo(withResult.event(), outputStream);
                     }
                 } else {
                     ByteBuffer eventBuffer = (ByteBuffer) item;
                     outputStream.write(eventBuffer);
                 }
             } catch (Throwable t) {
-                logger.error(marker, "Could not send event", t);
+                logger.error("Could not send event", t);
                 subscription.cancel();
             }
 

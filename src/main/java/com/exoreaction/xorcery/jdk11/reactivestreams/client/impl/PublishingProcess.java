@@ -1,10 +1,10 @@
 package com.exoreaction.xorcery.jdk11.reactivestreams.client.impl;
 
 import com.exoreaction.xorcery.jdk11.configuration.Configuration;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaReader;
+import com.exoreaction.xorcery.jdk11.media.providers.XorceryClientMediaWriter;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.websocket.PublishWebSocketEndpoint;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.ws.rs.ext.MessageBodyReader;
-import jakarta.ws.rs.ext.MessageBodyWriter;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
@@ -28,8 +28,8 @@ public final class PublishingProcess {
     private final ObjectMapper objectMapper;
     private final Timer timer;
     private final ByteBufferPool byteBufferPool;
-    private final MessageBodyReader<Object> resultReader;
-    private final MessageBodyWriter<Object> eventWriter;
+    private final XorceryClientMediaReader<Object> resultReader;
+    private final XorceryClientMediaWriter<Object> eventWriter;
     private final Type eventType;
     private final Type resultType;
     private final URI subscriberWebsocketUri;
@@ -39,8 +39,8 @@ public final class PublishingProcess {
 
     public PublishingProcess(WebSocketClient webSocketClient, ObjectMapper objectMapper, Timer timer,
                              ByteBufferPool byteBufferPool,
-                             MessageBodyReader<Object> resultReader,
-                             MessageBodyWriter<Object> eventWriter,
+                             XorceryClientMediaReader<Object> resultReader,
+                             XorceryClientMediaWriter<Object> eventWriter,
                              Type eventType,
                              Type resultType,
                              URI subscriberWebsocketUri,
@@ -125,11 +125,11 @@ public final class PublishingProcess {
         return byteBufferPool;
     }
 
-    public MessageBodyReader<Object> resultReader() {
+    public XorceryClientMediaReader<Object> resultReader() {
         return resultReader;
     }
 
-    public MessageBodyWriter<Object> eventWriter() {
+    public XorceryClientMediaWriter<Object> eventWriter() {
         return eventWriter;
     }
 

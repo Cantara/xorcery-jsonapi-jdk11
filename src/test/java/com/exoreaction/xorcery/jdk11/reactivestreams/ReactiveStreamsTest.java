@@ -2,7 +2,7 @@ package com.exoreaction.xorcery.jdk11.reactivestreams;
 
 import com.exoreaction.xorcery.jdk11.configuration.Configuration;
 import com.exoreaction.xorcery.jdk11.reactivestreams.client.api.ReactiveStreamsClient;
-import com.exoreaction.xorcery.jdk11.reactivestreams.client.impl.JettyAndJerseyBasedReactiveStreamsClient;
+import com.exoreaction.xorcery.jdk11.reactivestreams.client.impl.JettyBasedReactiveStreamsClient;
 import com.exoreaction.xorcery.jdk11.reactivestreams.fibonacci.FibonacciPublisher;
 import com.exoreaction.xorcery.jdk11.reactivestreams.media.LongMessageBodyReader;
 import com.exoreaction.xorcery.jdk11.reactivestreams.media.LongMessageBodyWriter;
@@ -23,10 +23,10 @@ public class ReactiveStreamsTest {
     public void thatSequenceCanBePublished() throws InterruptedException, ExecutionException, TimeoutException {
         Configuration configuration = new Configuration.Builder()
                 .build();
-        ReactiveStreamsClient reactiveStreamsClient = new JettyAndJerseyBasedReactiveStreamsClient(
+        ReactiveStreamsClient reactiveStreamsClient = new JettyBasedReactiveStreamsClient(
                 configuration,
-                List.of(LongMessageBodyWriter.class),
-                List.of(LongMessageBodyReader.class)
+                List.of(new LongMessageBodyWriter()),
+                List.of(new LongMessageBodyReader())
         );
         CompletableFuture<Void> future = reactiveStreamsClient.publish(URI.create("ws://localhost:60797/fibonacci"), configuration, new FibonacciPublisher(12), FibonacciPublisher.class)
                 .thenAccept(v -> {
