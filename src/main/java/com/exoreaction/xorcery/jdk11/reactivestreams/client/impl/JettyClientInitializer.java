@@ -6,8 +6,6 @@ import org.eclipse.jetty.client.dynamic.HttpClientTransportDynamic;
 import org.eclipse.jetty.client.http.HttpClientConnectionFactory;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
-import org.eclipse.jetty.http3.client.HTTP3Client;
-import org.eclipse.jetty.http3.client.http.ClientConnectionFactoryOverHTTP3;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
 import org.eclipse.jetty.util.resource.Resource;
@@ -34,7 +32,6 @@ public class JettyClientInitializer {
         ClientConnectionFactory.Info http1 = HttpClientConnectionFactory.HTTP11;
 
         ClientConnectionFactoryOverHTTP2.HTTP2 http2 = null;
-        ClientConnectionFactoryOverHTTP3.HTTP3 http3 = null;
 
         if (configuration.getBoolean("client.http2.enabled").orElse(false)) {
             // HTTP/2
@@ -72,25 +69,10 @@ public class JettyClientInitializer {
 
 
             connector.setSslContextFactory(sslClientContextFactory);
-
-            // HTTP/3
-            if (configuration.getBoolean("client.http3.enabled").orElse(false)) {
-                HTTP3Client h3Client = new HTTP3Client();
-                h3Client.getClientConnector().setIdleTimeout(Duration.ofSeconds(configuration.getLong("client.idle_timeout").orElse(-1L)));
-                h3Client.getQuicConfiguration().setSessionRecvWindow(64 * 1024 * 1024);
-                http3 = new ClientConnectionFactoryOverHTTP3.HTTP3(h3Client);
-                h3Client.getClientConnector().setSslContextFactory(sslClientContextFactory);
-            }
         }
 
         // Figure out correct transport dynamics
-        if (http3 != null) {
-            if (http2 != null) {
-                transport = new HttpClientTransportDynamic(connector, http1, http3, http2);
-            } else {
-                transport = new HttpClientTransportDynamic(connector, http1, http3);
-            }
-        } else if (http2 != null) {
+        if (http2 != null) {
             transport = new HttpClientTransportDynamic(connector, http1, http2);
         } else {
             transport = new HttpClientTransportDynamic(connector, http1);

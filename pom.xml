@@ -75,10 +75,6 @@
             <artifactId>http2-http-client-transport</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.eclipse.jetty.http3</groupId>
-            <artifactId>http3-http-client-transport</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.36</version> <!-- please leave this version at 1.7.x for compatibility reasons -->
