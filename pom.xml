@@ -81,7 +81,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.36</version>
+            <version>1.7.36</version> <!-- please leave this version at 1.7.x for compatibility reasons -->
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
