@@ -135,7 +135,12 @@ public class PublishWebSocketEndpoint
                 logger.debug("Received request:{}", requestAmount);
             }
 
-            semaphore.release((int) requestAmount);
+            int requestAmountAsInt = (int) requestAmount;
+            if ((long) requestAmountAsInt != requestAmount) {
+                logger.warn("requested amount truncation from long to int. long={}, int={}", requestAmount, requestAmountAsInt);
+            }
+
+            semaphore.release(requestAmountAsInt);
             subscription.request(requestAmount);
         }
     }
