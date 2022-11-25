@@ -101,6 +101,7 @@ public class PublishWebSocketEndpoint
     // WebSocket
     @Override
     public void onWebSocketConnect(Session session) {
+        senderLogger.trace("onWebSocketConnect, session.remoteAddress={}", session.getRemoteAddress().toString());
         this.session = session;
 
         // First send parameters, if available
@@ -122,6 +123,7 @@ public class PublishWebSocketEndpoint
 
     @Override
     public void onWebSocketText(String message) {
+        senderLogger.trace("onWebSocketText (back-pressure), message={}", message);
 
         long requestAmount = Long.parseLong(message);
 
@@ -129,8 +131,9 @@ public class PublishWebSocketEndpoint
             logger.info("Received cancel on websocket " + webSocketPath);
             subscription.cancel();
         } else {
-            if (logger.isDebugEnabled())
-                logger.debug("Received request:" + requestAmount);
+            if (logger.isDebugEnabled()) {
+                logger.debug("Received request:{}", requestAmount);
+            }
 
             semaphore.release((int) requestAmount);
             subscription.request(requestAmount);
@@ -139,6 +142,7 @@ public class PublishWebSocketEndpoint
 
     @Override
     public void onWebSocketBinary(byte[] payload, int offset, int len) {
+        senderLogger.trace("onWebSocketBinary, len={}", len);
         try {
             if (resultReader != null) {
                 // Check if we are getting an exception back
@@ -185,6 +189,7 @@ public class PublishWebSocketEndpoint
     public void onWebSocketError(Throwable cause) {
         if (cause instanceof ClosedChannelException) {
             // Ignore
+            senderLogger.warn("Got ClosedChannelException, cancelling subscription upstream.");
             subscription.cancel();
             publishingProcess.result().completeExceptionally(cause); // Now considered done
         } else {
@@ -233,15 +238,20 @@ public class PublishWebSocketEndpoint
         session.close(1000, "complete");
     }
 
+    private static final Logger senderLogger = LoggerFactory.getLogger(Sender.class);
+
     // EventHandler
-    public class Sender
+    private class Sender
             implements EventHandler<AtomicReference<Object>> {
 
         @Override
         public void onEvent(AtomicReference<Object> event, long sequence, boolean endOfBatch) throws Exception {
+            senderLogger.trace("onEvent() sequence={}, endOfBatch={}", sequence, endOfBatch);
             while (!semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-                if (!session.isOpen())
+                if (!session.isOpen()) {
+                    senderLogger.warn("session is not open, discarding event!");
                     return;
+                }
             }
 
             ByteBufferOutputStream2 outputStream = new ByteBufferOutputStream2(pool, true);
@@ -272,6 +282,8 @@ public class PublishWebSocketEndpoint
             // Send it
             ByteBuffer eventBuffer = outputStream.takeByteBuffer();
 
+            senderLogger.trace("Writing {} bytes on web-socket", eventBuffer.remaining());
+
             session.getRemote().sendBytes(eventBuffer, new WriteCallback() {
                 @Override
                 public void writeFailed(Throwable t) {
@@ -282,11 +294,16 @@ public class PublishWebSocketEndpoint
                 @Override
                 public void writeSuccess() {
                     pool.release(eventBuffer);
+                    senderLogger.trace("Successfully wrote bytes on web-socket");
                 }
             });
 
-            if (endOfBatch)
+            if (endOfBatch) {
                 session.getRemote().flush();
+                senderLogger.trace("Flushed web-socket session.");
+            } else {
+                senderLogger.trace("Event part of a batch, not flushing until we get the disruptor end-of-batch signal");
+            }
         }
     }
 }

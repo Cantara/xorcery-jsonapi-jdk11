@@ -63,6 +63,7 @@ public final class PublishingProcess {
 
     public void start() {
         if (result.isDone()) {
+            logger.trace("Result already done, cannot start publishing process");
             return;
         }
 
@@ -72,6 +73,7 @@ public final class PublishingProcess {
 
         ForkJoinPool.commonPool().execute(() ->
         {
+            logger.trace("Connecting Jetty WebSocket client");
             try {
                 webSocketClient.connect(new PublishWebSocketEndpoint(
                                 subscriberWebsocketUri.toASCIIString(),
@@ -94,6 +96,7 @@ public final class PublishingProcess {
     }
 
     private void complete(Session session, Throwable throwable) {
+        logger.trace("WebSocket complete");
         if (throwable != null) {
             logger.error("Could not subscribe to " + subscriberWebsocketUri.toASCIIString(), throwable);
             retry();
@@ -101,6 +104,7 @@ public final class PublishingProcess {
     }
 
     public void retry() {
+        logger.trace("Scheduling retry");
         timer.schedule(new TimerTask() {
             @Override
             public void run() {

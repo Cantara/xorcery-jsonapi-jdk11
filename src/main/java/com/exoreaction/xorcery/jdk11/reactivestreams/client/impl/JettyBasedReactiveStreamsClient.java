@@ -12,6 +12,8 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.io.ArrayByteBufferPool;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -27,7 +29,11 @@ import java.util.Timer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
+import static java.util.Optional.ofNullable;
+
 public class JettyBasedReactiveStreamsClient implements ReactiveStreamsClient {
+
+    private final static Logger logger = LoggerFactory.getLogger(JettyBasedReactiveStreamsClient.class);
 
     private final HttpClient httpClient;
     private final WebSocketClient webSocketClient;
@@ -74,6 +80,10 @@ public class JettyBasedReactiveStreamsClient implements ReactiveStreamsClient {
 
         XorceryClientMediaWriter<Object> eventWriter = getWriter(eventType);
         XorceryClientMediaReader<Object> resultReader = resultType.map(this::getReader).orElse(null);
+
+        logger.trace("Using eventWriter={} and resultReader={}",
+                ofNullable(eventWriter).map(ew -> ew.getClass().getName()).orElse(null),
+                ofNullable(resultReader).map(rr -> rr.getClass().getName()).orElse(null));
 
         // Start publishing process
         new PublishingProcess(
@@ -167,7 +177,7 @@ public class JettyBasedReactiveStreamsClient implements ReactiveStreamsClient {
     }
 
     private Optional<Type> getResultType(Type type) {
-        return Optional.ofNullable(type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(WithResult.class) ? ((ParameterizedType) type).getActualTypeArguments()[1] : null);
+        return ofNullable(type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(WithResult.class) ? ((ParameterizedType) type).getActualTypeArguments()[1] : null);
     }
 
     private XorceryClientMediaWriter<Object> getWriter(Type type) {
