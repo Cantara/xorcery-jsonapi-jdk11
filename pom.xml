@@ -4,7 +4,7 @@
 
     <groupId>com.exoreaction.xorcery</groupId>
     <artifactId>xorcery-jsonapi-jdk11</artifactId>
-    <version>0.27-SNAPSHOT</version>
+    <version>0.27</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -19,7 +19,7 @@
         <developerConnection>scm:git:ssh://git@github.com/Cantara/xorcery-json-api.git</developerConnection>
         <connection>scm:git:https://github.com/Cantara/xorcery-json-api.git</connection>
         <url>https://github.com/Cantara/xorcery-json-api</url>
-        <tag>HEAD</tag>
+        <tag>xorcery-jsonapi-jdk11-0.27</tag>
     </scm>
 
     <dependencyManagement>
